@@ -9,7 +9,7 @@ Sistema de agendamiento de citas para salones de estética.
 | Keiner Alberto Hortua Suarez | [@Keinerhs](https://github.com/Keinerhs) |
 | Zhary Marioth Pinto Mena | [@tiburoncin00](https://github.com/tiburoncin00) |
 
-## 🛠️ Stack Tecnológico
+## Stack Tecnológico
 
 - **Frontend:** React
 - **Backend:** FastAPI (Python)
