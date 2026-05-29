@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
 // Pages
+
 import LoginPage        from './pages/LoginPage'
 import AdminDashboard   from './pages/AdminDashboard'
 import ProfessionalPage from './pages/ProfessionalPage'
@@ -26,6 +27,9 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public */}
+      
+      <Route path="/profesional" element={<ProfessionalPage />} />
+      <Route path="/" element={<PublicLanding />} />
       <Route path="/"        element={<PublicLanding />} />
       <Route path="/agendar" element={<BookingPage />} />
       <Route path="/login"   element={
@@ -35,12 +39,7 @@ function AppRoutes() {
       } />
 
       {/* Admin */}
-      <Route path="/admin/*" element={
-        <ProtectedRoute allowedRoles={['admin']}>
-          <AdminDashboard />
-        </ProtectedRoute>
-      } />
-
+      <Route path="/admin/*" element={<AdminDashboard />} />
       {/* Professional */}
       <Route path="/profesional/*" element={
         <ProtectedRoute allowedRoles={['profesional']}>
