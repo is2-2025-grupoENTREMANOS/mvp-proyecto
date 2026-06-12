@@ -1,53 +1,81 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { serviceService } from '../services/serviceService';
+import { professionalService } from '../services/professionalService';
 import '../styles/public-landing.css';
 
-// ── ANIMACIONES REUTILIZABLES ───────────────────────────
+
+// ── ANIMACIONES ─────────────────────────────────────────────────
 const fadeUp = {
   hidden:  { opacity: 0, y: 24 },
   visible: { opacity: 1, y: 0  },
-};
-
-const fadeIn = {
-  hidden:  { opacity: 0 },
-  visible: { opacity: 1 },
 };
 
 const stagger = {
   visible: { transition: { staggerChildren: 0.1 } },
 };
 
-// ── DATOS MOCK ──────────────────────────────────────────
+// ─ Carrusel ──────────────────────────
 const CAROUSEL_SLIDES = [
-  { id:1, bg:'#D4C5B5', caption:'Un espacio para ti' },
-  { id:2, bg:'#C5D4CA', caption:'Bienestar que se siente' },
-  { id:3, bg:'#D4CAC5', caption:'Manos expertas, resultados reales' },
-  { id:4, bg:'#C5CAD4', caption:'Tu momento de paz comienza aquí' },
+  {
+    id: 1,
+    image: '/images/zona.png',
+    caption: 'Un espacio para ti'
+  },
+  {
+    id: 2,
+    image: '/images/nails.png',
+    caption: 'Bienestar que se siente'
+  },
+  {
+    id: 3,
+    image: '/images/team.png',
+    caption: 'Manos expertas, resultados reales'
+  },
+  {
+    id: 4,
+    image: '/images/satis.png',
+    caption: 'Tu momento de paz comienza aquí'
+  },
 ];
 
-const PROFESSIONALS = [
-  { name:'Katherine Gómez', role:'Directora & Esteticista',   color:'#4A7C59', desc:'Especialista en tratamientos faciales y técnicas de bienestar integral.' },
-  { name:'Laura Torres',    role:'Masajista Certificada',     color:'#C9A84C', desc:'Experta en masoterapia y técnicas de relajación profunda.' },
-  { name:'Ana Martínez',    role:'Manicurista & Nail Artist', color:'#7B5EA7', desc:'Artista especializada en nail art y tratamientos de manos y pies.' },
-  { name:'Sofia Reyes',     role:'Cosmetóloga',               color:'#D94F4F', desc:'Especialista en tratamientos corporales y cuidado de la piel.' },
-];
+const PROF_COLORS = ['#4A7C59', '#C9A84C', '#7B5EA7', '#D94F4F'];
 
-const SERVICES = [
-  { id:1, name:'Facial Hidratante',   desc:'Tratamiento profundo que devuelve luminosidad y vitalidad a tu piel.', fullDesc:'Nuestro facial hidratante es un tratamiento de alta gama diseñado para restaurar la barrera hidrolipídica de tu piel. Utilizamos ácido hialurónico, extracto de aloe vera y vitamina C para lograr una hidratación profunda y duradera.', price:'$120.000', dur:'60 min', bg:'#C5D4CA' },
-  { id:2, name:'Manicure Completa',   desc:'Cuidado integral de manos con limado, cutículas, hidratación y esmaltado.', fullDesc:'Nuestra manicure completa incluye remojo relajante, limado y moldeado de uñas, retiro de cutículas, exfoliación e hidratación de manos, y aplicación de esmalte a tu elección.', price:'$80.000', dur:'45 min', bg:'#D4C5B5' },
-  { id:3, name:'Masaje Relajante',    desc:'Técnica sueca para liberar tensiones y promover el bienestar corporal.', fullDesc:'Nuestro masaje combina técnicas de masoterapia sueca con aceites esenciales premium para liberar tensiones, mejorar la circulación y devolverte un estado de bienestar profundo.', price:'$150.000', dur:'75 min', bg:'#CAC5D4' },
-  { id:4, name:'Pedicure Spa',        desc:'Experiencia completa de cuidado de pies con sales, masaje y esmaltado.', fullDesc:'El Pedicure Spa incluye baño de sales minerales, exfoliación con azúcar natural, masaje de pies y pantorrillas, hidratación intensiva y esmaltado de larga duración.', price:'$200.000', dur:'90 min', bg:'#D4CAC5' },
-  { id:5, name:'Depilación de Cejas', desc:'Diseño adaptado a la morfología de tu rostro para un resultado natural.', fullDesc:'Analizamos la morfología de tu rostro para diseñar unas cejas que enmarquen perfectamente tus ojos. Utilizamos hilo, cera o pinza según tu tipo de piel.', price:'$60.000', dur:'30 min', bg:'#C5D4C5' },
-  { id:6, name:'Tratamiento Capilar', desc:'Nutrición intensiva para tu cabello con keratina y proteínas de seda.', fullDesc:'Utilizamos keratina hidrolizada y proteínas de seda para restaurar la fibra capilar dañada, eliminar el frizz y devolver el brillo natural. Resultados visibles desde la primera sesión.', price:'$180.000', dur:'80 min', bg:'#D4C5CA' },
-];
-
-// ── COMPONENTE PRINCIPAL ────────────────────────────────
+// ── COMPONENTE PRINCIPAL ────────────────────────────────────────
 export default function PublicLanding() {
   const navigate = useNavigate();
-  const [activeSlide,      setActiveSlide]      = useState(0);
-  const [selectedService,  setSelectedService]  = useState(null);
 
+  // ── Estados carrusel ──
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  // ── Estados API ──
+  const [services,      setServices]      = useState([]);
+  const [professionals, setProfessionals] = useState([]);
+  const [loadingSvc,    setLoadingSvc]    = useState(true);
+  const [loadingPro,    setLoadingPro]    = useState(true);
+  const [errorSvc,      setErrorSvc]      = useState(null);
+  const [errorPro,      setErrorPro]      = useState(null);
+
+  // ── Estado modal ──
+  const [selectedService, setSelectedService] = useState(null);
+
+  // ── Cargar datos desde la API ──
+  useEffect(() => {
+  // Cargar servicios
+  serviceService.getAll()
+    .then(res => setServices(res.data))
+    .catch(() => setErrorSvc('No se pudieron cargar los servicios'))
+    .finally(() => setLoadingSvc(false));
+
+  // Cargar profesionales
+  professionalService.getAll()
+    .then(res => setProfessionals(res.data))
+    .catch(() => setErrorPro('No se pudieron cargar los profesionales'))
+    .finally(() => setLoadingPro(false));
+}, []);
+
+  // ── Carrusel autoplay ──
   const nextSlide = useCallback(() => {
     setActiveSlide(prev => (prev + 1) % CAROUSEL_SLIDES.length);
   }, []);
@@ -61,11 +89,38 @@ export default function PublicLanding() {
     return () => clearInterval(t);
   }, [nextSlide]);
 
-  const handleBook    = () => navigate('/login');
-  const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior:'smooth' });
+  // ── Helpers ──
+  const handleBook = () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        navigate('/mis-citas');
+      return;
+    }
+    // Si ya tiene sesión, decodifica el rol del token
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload?.rol === 'admin')        navigate('/admin');
+      else if (payload?.rol === 'profesional') navigate('/profesional');
+      else navigate('/booking');
+    } catch {
+      localStorage.removeItem('token');
+      navigate('/login');
+    }
+  };
+  const scrollTo    = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+
+  const formatService = (service) => ({
+  ...service,
+  bg: '#C5D4CA',
+  fullDesc:
+    service.descripcion ||
+    'Tratamiento especializado de alta calidad.',
+  dur: `${service.duracion} min`,
+  price: `$${Number(service.precio).toLocaleString('es-CO')}`,
+});
 
   return (
-    <div style={{ background:'var(--bg)' }}>
+    <div style={{ background: 'var(--bg)' }}>
 
       {/* ── NAVBAR ── */}
       <motion.nav
@@ -76,20 +131,29 @@ export default function PublicLanding() {
       >
         <a className="land-nav-logo" href="/">
           <div className="land-nav-logo-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-              <path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
-            </svg>
+            <img
+              src="/logo/EntreM.jpg"
+              alt="Entre Manos"
+              className="navbar-logo"
+            />
           </div>
           <div className="land-nav-logo-text">Entre<span>Manos</span></div>
         </a>
+
         <div className="land-nav-links">
-          {['nosotros','servicios','equipo','contacto'].map(id => (
-            <span key={id} className="land-nav-link"
-              onClick={() => scrollTo(id)}>
-              {id.charAt(0).toUpperCase() + id.slice(1)}
+          {[
+            { label:'Nosotros', id:'nosotros' },
+            { label:'Servicios', id:'servicios' },
+            { label:'Equipo', id:'equipo' },
+            { label:'Contacto', id:'contacto' },
+          ].map(item => (
+            <span key={item.id} className="land-nav-link"
+              onClick={() => scrollTo(item.id)}>
+              {item.label}
             </span>
           ))}
         </div>
+
         <button className="land-nav-cta" onClick={handleBook}>Agendar cita</button>
       </motion.nav>
 
@@ -113,7 +177,7 @@ export default function PublicLanding() {
           </motion.h1>
 
           <motion.p className="hero-subtitle" variants={fadeUp} transition={{ duration:.5, delay:.2 }}>
-            Entre Manos — Estética premium
+            Entre Manos - Entre Nos
           </motion.p>
 
           <motion.p className="hero-desc" variants={fadeUp} transition={{ duration:.5, delay:.3 }}>
@@ -130,9 +194,9 @@ export default function PublicLanding() {
           <motion.div className="hero-stats" variants={fadeUp} transition={{ duration:.5, delay:.5 }}>
             {[
               { value:'500+', label:'Clientes satisfechas' },
-              { value:'6+',   label:'Años de experiencia'  },
-              { value:'4',    label:'Especialistas'         },
-            ].map((s,i) => (
+              { value:'3+',   label:'Años de experiencia'  },
+              { value: professionals.length, label:'Especialistas'},
+            ].map((s, i) => (
               <div key={i}>
                 <div className="hero-stat-value">{s.value}</div>
                 <div className="hero-stat-label">{s.label}</div>
@@ -150,31 +214,44 @@ export default function PublicLanding() {
         >
           <div className="carousel">
             {CAROUSEL_SLIDES.map((slide, i) => (
-              <div key={slide.id} className={`carousel-slide ${i === activeSlide ? 'active' : ''}`}>
-                <div className="carousel-placeholder"
-                  style={{ background:`linear-gradient(135deg, ${slide.bg}, ${slide.bg}cc)` }}>
-                  <svg width="48" height="48" fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="1.5" viewBox="0 0 24 24">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    <circle cx="8.5" cy="8.5" r="1.5"/>
-                    <polyline points="21,15 16,10 5,21"/>
-                  </svg>
-                  <span style={{fontSize:'13px',color:'rgba(255,255,255,.5)'}}>Imagen del spa</span>
+              <div key={slide.id}
+                className={`carousel-slide ${i === activeSlide ? 'active' : ''}`}>
+                <div
+                  className="carousel-placeholder"
+                  style={{
+                    backgroundImage: `url(${slide.image})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat'
+                  }}
+                >
+                  
                 </div>
                 <div className="carousel-caption">
                   <div className="carousel-caption-text">{slide.caption}</div>
                 </div>
               </div>
             ))}
+
             <button className="carousel-arrow prev" onClick={prevSlide}>
-              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="15,18 9,12 15,6"/></svg>
+              <svg width="16" height="16" fill="none" stroke="currentColor"
+                strokeWidth="2.5" viewBox="0 0 24 24">
+                <polyline points="15,18 9,12 15,6"/>
+              </svg>
             </button>
             <button className="carousel-arrow next" onClick={nextSlide}>
-              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="9,18 15,12 9,6"/></svg>
+              <svg width="16" height="16" fill="none" stroke="currentColor"
+                strokeWidth="2.5" viewBox="0 0 24 24">
+                <polyline points="9,18 15,12 9,6"/>
+              </svg>
             </button>
+
             <div className="carousel-dots">
-              {CAROUSEL_SLIDES.map((_,i) => (
-                <button key={i} className={`carousel-dot ${i === activeSlide ? 'active' : ''}`}
-                  onClick={() => setActiveSlide(i)} />
+              {CAROUSEL_SLIDES.map((_, i) => (
+                <button key={i}
+                  className={`carousel-dot ${i === activeSlide ? 'active' : ''}`}
+                  onClick={() => setActiveSlide(i)}
+                />
               ))}
             </div>
           </div>
@@ -184,8 +261,8 @@ export default function PublicLanding() {
       {/* ── INFO DEL SPA ── */}
       <section className="section section-alt" id="nosotros">
         <motion.div
-          initial="hidden" whileInView="visible" viewport={{ once:true, amount:.2 }}
-          variants={stagger}
+          initial="hidden" whileInView="visible"
+          viewport={{ once:true, amount:.2 }} variants={stagger}
         >
           <motion.div className="section-label" variants={fadeUp} transition={{ duration:.4 }}>
             Quiénes somos
@@ -195,32 +272,48 @@ export default function PublicLanding() {
           </motion.h2>
           <motion.p className="section-desc" variants={fadeUp} transition={{ duration:.4, delay:.2 }}>
             En Entre Manos creemos que el bienestar es una necesidad, no un lujo.
-            Desde 2018 hemos acompañado a cientos de personas en su camino hacia
+            Desde 2023 hemos acompañado a cientos de personas en su camino hacia
             el equilibrio y el autocuidado.
           </motion.p>
         </motion.div>
 
+        {/* CARDS INFO */}
         <div className="info-grid">
           <motion.div
             className="info-cards"
-            initial="hidden" whileInView="visible" viewport={{ once:true, amount:.2 }}
-            variants={stagger}
+            initial="hidden" whileInView="visible"
+            viewport={{ once:true, amount:.2 }} variants={stagger}
           >
             {[
-              { title:'Dirección', value:'Calle 45 #12-30, Centro, Bogotá',
-                icon:<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> },
-              { title:'Horarios', value:'Lun – Sáb: 9:00 – 19:00\nDomingo: Cerrado',
-                icon:<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg> },
-              { title:'Teléfono', value:'+57 301 234 5678',
-                icon:<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.61 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.29 6.29l.86-.86a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> },
-              { title:'Correo', value:'hola@entremanos.com',
-                icon:<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> },
-            ].map((card,i) => (
-              <motion.div key={i} className="info-card" variants={fadeUp} transition={{ duration:.4 }}
+              {
+                title: 'Dirección',
+                value: 'Calle 10 # 35 - 45, Aguachica - Cesar',
+                icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>,
+              },
+              {
+                title: 'Horarios',
+                value: 'Lun – Sáb: 8:30 – 19:00\nDomingo: Cerrado',
+                icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>,
+              },
+              {
+                title: 'Teléfono',
+                value: '+57 318 925 3169',
+                icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.61 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.29 6.29l.86-.86a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
+              },
+              {
+                title: 'Correo',
+                value: 'kategom@entremanos.com',
+                icon: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+              },
+            ].map((card, i) => (
+              <motion.div key={i} className="info-card" variants={fadeUp}
+                transition={{ duration:.4 }}
                 whileHover={{ y:-3, boxShadow:'0 8px 24px rgba(0,0,0,.1)' }}>
                 <div className="info-card-icon">{card.icon}</div>
                 <div className="info-card-title">{card.title}</div>
-                <div className="info-card-value" style={{whiteSpace:'pre-line'}}>{card.value}</div>
+                <div className="info-card-value" style={{whiteSpace:'pre-line'}}>
+                  {card.value}
+                </div>
               </motion.div>
             ))}
           </motion.div>
@@ -229,12 +322,19 @@ export default function PublicLanding() {
             initial={{ opacity:0, x:30 }} whileInView={{ opacity:1, x:0 }}
             viewport={{ once:true }} transition={{ duration:.5 }}>
             <div className="map-placeholder">
-              <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/>
-                <circle cx="12" cy="10" r="3"/>
-              </svg>
-              <span>Mapa — Calle 45 #12-30, Bogotá</span>
-              <span style={{fontSize:'11px',opacity:.6}}>Reemplaza con tu embed de Google Maps</span>
+              <iframe
+                src="https://www.google.com/maps/embed?pb=!1m10!1m8!1m3!1d7895.941842494538!2d-73.60100652113493!3d8.305688341032583!3m2!1i1024!2i768!4f13.1!5e0!3m2!1ses!2sco!4v1781250674011!5m2!1ses!2sco"
+                width="100%"
+                height="100%"
+                style={{
+                  border: 0,
+                  borderRadius: '24px'
+                }}
+                allowFullScreen=""
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                title="Mapa Entre Manos"
+              ></iframe>
             </div>
             <button className="btn-secondary" style={{width:'100%'}} onClick={handleBook}>
               Agendar cita ahora
@@ -242,14 +342,19 @@ export default function PublicLanding() {
           </motion.div>
         </div>
 
-        {/* EQUIPO */}
+        {/* EQUIPO — datos reales de la API */}
         <div id="equipo" style={{marginTop:'64px'}}>
           <motion.div
-            initial="hidden" whileInView="visible" viewport={{ once:true, amount:.2 }}
-            variants={stagger}
+            initial="hidden" whileInView="visible"
+            viewport={{ once:true, amount:.2 }} variants={stagger}
           >
-            <motion.div className="section-label" variants={fadeUp}>Nuestro equipo</motion.div>
-            <motion.h3 variants={fadeUp} style={{fontFamily:'Playfair Display, serif', fontSize:'28px', fontWeight:'600', color:'var(--tx)', marginBottom:'8px'}}>
+            <motion.div className="section-label" variants={fadeUp}>
+              Nuestro equipo
+            </motion.div>
+            <motion.h3 variants={fadeUp} style={{
+              fontFamily:'Playfair Display, serif', fontSize:'28px',
+              fontWeight:'600', color:'var(--tx)', marginBottom:'8px',
+            }}>
               Especialistas que te cuidan
             </motion.h3>
             <motion.p variants={fadeUp} style={{fontSize:'14px', color:'var(--tx2)'}}>
@@ -257,34 +362,57 @@ export default function PublicLanding() {
             </motion.p>
           </motion.div>
 
-          <motion.div
-            className="team-grid"
-            initial="hidden" whileInView="visible" viewport={{ once:true, amount:.2 }}
-            variants={stagger}
-          >
-            {PROFESSIONALS.map((p,i) => (
-              <motion.div key={i} className="team-card" variants={fadeUp}
-                transition={{ duration:.4 }}
-                whileHover={{ y:-4, boxShadow:'0 12px 32px rgba(0,0,0,.1)' }}>
-                <div className="team-avatar" style={{background:p.color}}>
-                  {p.name.split(' ').map(n=>n[0]).join('')}
-                </div>
-                <div className="team-name">{p.name}</div>
-                <div className="team-role">{p.role}</div>
-                <div className="team-desc">{p.desc}</div>
-              </motion.div>
-            ))}
-          </motion.div>
+          {loadingPro && (
+            <div style={{
+              textAlign:'center', padding:'40px',
+              color:'var(--tx2)', fontSize:'14px',
+            }}>
+              Cargando equipo...
+            </div>
+          )}
+
+          {errorPro && (
+            <div style={{
+              textAlign:'center', padding:'40px',
+              color:'var(--err)', fontSize:'14px',
+            }}>
+              {errorPro}
+            </div>
+          )}
+
+          {!loadingPro && !errorPro && (
+            <motion.div
+              className="team-grid"
+              initial="hidden" whileInView="visible"
+              viewport={{ once:true, amount:.2 }} variants={stagger}
+            >
+              {professionals.map((p, i) => (
+                <motion.div key={p.id} className="team-card" variants={fadeUp}
+                  transition={{ duration:.4 }}
+                  whileHover={{ y:-4, boxShadow:'0 12px 32px rgba(0,0,0,.1)' }}>
+                  <div className="team-avatar"
+                    style= {{background: ['#4A7C59', '#C9A84C', '#7B5EA7', '#D94F4F'][i % 4]}}>
+                    {p.nombre.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                  </div>
+                  <div className="team-name">{p.nombre}</div>
+                  <div className="team-role">{p.especialidad || 'Especialista'}</div>
+                  <div className="team-desc">{p.descripcion || ''}</div>
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
         </div>
       </section>
 
-      {/* ── SERVICIOS ── */}
+      {/* ── SERVICIOS — datos reales de la API ── */}
       <section className="section" id="servicios">
         <motion.div
-          initial="hidden" whileInView="visible" viewport={{ once:true, amount:.2 }}
-          variants={stagger}
+          initial="hidden" whileInView="visible"
+          viewport={{ once:true, amount:.2 }} variants={stagger}
         >
-          <motion.div className="section-label" variants={fadeUp}>Lo que ofrecemos</motion.div>
+          <motion.div className="section-label" variants={fadeUp}>
+            Lo que ofrecemos
+          </motion.div>
           <motion.h2 className="section-title" variants={fadeUp} transition={{ delay:.1 }}>
             Nuestros servicios
           </motion.h2>
@@ -294,21 +422,41 @@ export default function PublicLanding() {
           </motion.p>
         </motion.div>
 
-        <motion.div
-          className="services-grid"
-          initial="hidden" whileInView="visible" viewport={{ once:true, amount:.1 }}
-          variants={stagger}
-        >
-          {SERVICES.map(service => (
-            <motion.div key={service.id} variants={fadeUp} transition={{ duration:.4 }}>
-              <ServiceCard
-                service={service}
-                onSelect={() => setSelectedService(service)}
-                onBook={handleBook}
-              />
-            </motion.div>
-          ))}
-        </motion.div>
+        {loadingSvc && (
+          <div style={{
+            textAlign:'center', padding:'60px',
+            color:'var(--tx2)', fontSize:'14px',
+          }}>
+            Cargando servicios...
+          </div>
+        )}
+
+        {errorSvc && (
+          <div style={{
+            textAlign:'center', padding:'60px',
+            color:'var(--err)', fontSize:'14px',
+          }}>
+            {errorSvc}
+          </div>
+        )}
+
+        {!loadingSvc && !errorSvc && (
+          <motion.div
+            className="services-grid"
+            initial="hidden" whileInView="visible"
+            viewport={{ once:true, amount:.1 }} variants={stagger}
+          >
+            {services.map(service => (
+              <motion.div key={service.id} variants={fadeUp} transition={{ duration:.4 }}>
+                <ServiceCard
+                  service={formatService(service)}
+                  onSelect={() => setSelectedService(formatService(service))}
+                  onBook={handleBook}
+                />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
       </section>
 
       {/* ── CTA ── */}
@@ -318,10 +466,12 @@ export default function PublicLanding() {
         viewport={{ once:true }} transition={{ duration:.6 }}
       >
         <motion.div
-          initial="hidden" whileInView="visible" viewport={{ once:true }}
-          variants={stagger}
+          initial="hidden" whileInView="visible"
+          viewport={{ once:true }} variants={stagger}
         >
-          <motion.div className="cta-label" variants={fadeUp}>Tu bienestar nos importa</motion.div>
+          <motion.div className="cta-label" variants={fadeUp}>
+            Tu bienestar nos importa
+          </motion.div>
           <motion.h2 className="cta-title" variants={fadeUp} transition={{ delay:.1 }}>
             Reserva tu momento<br />de <em>bienestar</em>
           </motion.h2>
@@ -345,13 +495,14 @@ export default function PublicLanding() {
       <footer className="footer">
         <motion.div
           className="footer-grid"
-          initial="hidden" whileInView="visible" viewport={{ once:true, amount:.1 }}
-          variants={stagger}
+          initial="hidden" whileInView="visible"
+          viewport={{ once:true, amount:.1 }} variants={stagger}
         >
           <motion.div variants={fadeUp}>
             <div className="footer-logo">
               <div className="footer-logo-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" width="18" height="18">
+                <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"
+                  width="18" height="18">
                   <path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
                 </svg>
               </div>
@@ -366,7 +517,7 @@ export default function PublicLanding() {
                 <svg key="ig" width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>,
                 <svg key="wa" width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>,
                 <svg key="fb" width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>,
-              ].map((icon,i) => (
+              ].map((icon, i) => (
                 <motion.button key={i} className="footer-social-btn"
                   whileHover={{ scale:1.1 }} whileTap={{ scale:.95 }}>
                   {icon}
@@ -377,40 +528,48 @@ export default function PublicLanding() {
 
           <motion.div variants={fadeUp} transition={{ delay:.1 }}>
             <div className="footer-col-title">Servicios</div>
-            {SERVICES.slice(0,5).map(s => (
-              <button key={s.id} className="footer-link" onClick={() => setSelectedService(s)}>{s.name}</button>
+            {services.slice(0, 5).map(s => (
+              <button key={s.id} className="footer-link"
+                onClick={() => setSelectedService(formatService(s))}>
+                {s.nombre}
+              </button>
             ))}
           </motion.div>
 
           <motion.div variants={fadeUp} transition={{ delay:.2 }}>
             <div className="footer-col-title">Contacto</div>
             {[
-              { icon:<svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>, text:'Calle 45 #12-30, Bogotá' },
-              { icon:<svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>, text:'Lun–Sáb: 9:00–19:00' },
-              { icon:<svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.61 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.29 6.29l.86-.86a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>, text:'+57 301 234 5678' },
-              { icon:<svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>, text:'hola@entremanos.com' },
-            ].map((item,i) => (
-              <div key={i} className="footer-contact-item">{item.icon}<span>{item.text}</span></div>
+              { icon:<svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>, text:'Calle 10 # 35 - 45, Colombia, Aguachica - Cesar' },
+              { icon:<svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>, text:'Lun–Sáb: 8:30–19:00' },
+              { icon:<svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.61 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.29 6.29l.86-.86a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>, text:'+57 318 925 3169' },
+              { icon:<svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>, text:'kategom@entremanos.com' },
+            ].map((item, i) => (
+              <div key={i} className="footer-contact-item">
+                {item.icon}<span>{item.text}</span>
+              </div>
             ))}
           </motion.div>
 
           <motion.div variants={fadeUp} transition={{ delay:.3 }}>
             <div className="footer-col-title">Navegación</div>
             {[
-              { label:'Inicio',       action:() => window.scrollTo({top:0,behavior:'smooth'}) },
+              { label:'Inicio',       action:() => window.scrollTo({top:0, behavior:'smooth'}) },
               { label:'Nosotros',     action:() => scrollTo('nosotros') },
               { label:'Servicios',    action:() => scrollTo('servicios') },
               { label:'Equipo',       action:() => scrollTo('equipo') },
               { label:'Agendar',      action:handleBook },
               { label:'Iniciar sesión', action:() => navigate('/login') },
-            ].map((item,i) => (
-              <button key={i} className="footer-link" onClick={item.action}>{item.label}</button>
+              { label: 'Mis citas', action: () => navigate('/mis-citas') },
+            ].map((item, i) => (
+              <button key={i} className="footer-link" onClick={item.action}>
+                {item.label}
+              </button>
             ))}
           </motion.div>
         </motion.div>
 
         <div className="footer-bottom">
-          <span>© 2026 Entre Manos. Todos los derechos reservados.</span>
+          <span>© 2026 Entre Manos. Zhary & Keiner</span>
           <span>Desarrollado con cuidado para el bienestar</span>
         </div>
       </footer>
@@ -432,20 +591,23 @@ export default function PublicLanding() {
               transition={{ duration:.25 }}
             >
               <div className="modal-img"
-                style={{background:`linear-gradient(135deg, ${selectedService.bg}, ${selectedService.bg}bb)`}}>
-                <svg width="48" height="48" fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="1.5" viewBox="0 0 24 24">
+                style={{ background:`linear-gradient(135deg, ${selectedService.bg}, ${selectedService.bg}bb)` }}>
+                <svg width="48" height="48" fill="none" stroke="rgba(255,255,255,.4)"
+                  strokeWidth="1.5" viewBox="0 0 24 24">
                   <rect x="3" y="3" width="18" height="18" rx="2"/>
                   <circle cx="8.5" cy="8.5" r="1.5"/>
                   <polyline points="21,15 16,10 5,21"/>
                 </svg>
               </div>
               <div className="modal-body">
-                <div className="modal-name">{selectedService.name}</div>
+                <div className="modal-name">{selectedService.nombre}</div>
                 <p className="modal-desc">{selectedService.fullDesc}</p>
                 <div className="modal-meta">
                   <div className="modal-meta-item">
                     <div className="modal-meta-label">Precio</div>
-                    <div className="modal-meta-value" style={{color:'var(--pri)'}}>{selectedService.price}</div>
+                    <div className="modal-meta-value" style={{color:'var(--pri)'}}>
+                      {selectedService.price}
+                    </div>
                   </div>
                   <div className="modal-meta-item">
                     <div className="modal-meta-label">Duración</div>
@@ -453,8 +615,12 @@ export default function PublicLanding() {
                   </div>
                 </div>
                 <div className="modal-footer">
-                  <button className="modal-close-btn" onClick={() => setSelectedService(null)}>Cerrar</button>
-                  <button className="modal-book-btn" onClick={() => { setSelectedService(null); handleBook(); }}>
+                  <button className="modal-close-btn"
+                    onClick={() => setSelectedService(null)}>
+                    Cerrar
+                  </button>
+                  <button className="modal-book-btn"
+                    onClick={() => { setSelectedService(null); handleBook(); }}>
                     Agendar este servicio
                   </button>
                 </div>
@@ -467,40 +633,55 @@ export default function PublicLanding() {
   );
 }
 
-// ── TARJETA DE SERVICIO ─────────────────────────────────
+// ── TARJETA DE SERVICIO ─────────────────────────────────────────
 function ServiceCard({ service, onSelect, onBook }) {
   return (
     <motion.div
       className="service-card"
       onClick={onSelect}
-      whileHover={{ y:-4, boxShadow:'0 12px 32px rgba(0,0,0,.1)', borderTopWidth:'3px', borderTopColor:'var(--acc)' }}
+      whileHover={{
+        y: -4,
+        boxShadow: '0 12px 32px rgba(0,0,0,.1)',
+        borderTopWidth: '3px',
+        borderTopColor: 'var(--acc)',
+      }}
       transition={{ duration:.2 }}
     >
-      <div className="service-card-img"
-        style={{ background:`linear-gradient(135deg, ${service.bg}, ${service.bg}aa)` }}>
-        <div className="service-card-img-placeholder">
-          <svg width="36" height="36" fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="1.5" viewBox="0 0 24 24">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <circle cx="8.5" cy="8.5" r="1.5"/>
-            <polyline points="21,15 16,10 5,21"/>
-          </svg>
-        </div>
+      <div className="service-card-img">
+        <img
+          src={
+            service.nombre === 'Pedicura'
+              ? '/services/pedicura.png'
+              : service.nombre === 'Retiro'
+              ? '/services/retiro.png'
+              : service.nombre === 'Semi Permanente'
+              ? '/services/semi.png'
+              : service.nombre === 'Press - On'
+              ? '/services/nailsh.png'
+              : '/services/pedicura.png'
+          }
+          alt={service.nombre}
+          className="service-image"
+        />
       </div>
       <div className="service-card-body">
-        <div className="service-card-name">{service.name}</div>
-        <div className="service-card-desc">{service.desc}</div>
+        <div className="service-card-name">{service.nombre}</div>
+        <div className="service-card-desc">{service.descripcion || service.desc}</div>
         <div className="service-card-meta">
           <div className="service-card-price">{service.price}</div>
           <div className="service-card-dur">
-            <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
+            <svg width="12" height="12" fill="none" stroke="currentColor"
+              strokeWidth="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12,6 12,12 16,14"/>
             </svg>
             {service.dur}
           </div>
         </div>
         <motion.button
           className="service-card-btn"
-          whileHover={{ scale:1.02 }} whileTap={{ scale:.97 }}
+          whileHover={{ scale:1.02 }}
+          whileTap={{ scale:.97 }}
           onClick={(e) => { e.stopPropagation(); onBook(); }}
         >
           Agendar

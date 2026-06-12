@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { authService } from '../services/api'
+import { authAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import styles from './LoginPage.module.css'
 
@@ -14,24 +14,42 @@ export default function LoginPage() {
   const navigate                    = useNavigate()
 
   const handleChange = (e) =>
-    setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
+  setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
 
-  const handleSubmit = async (e) => {
+    const handleSubmit = async (e) => {
     e.preventDefault()
+
     if (!form.email || !form.password) {
       toast.error('Por favor completa todos los campos')
       return
     }
+
     setLoading(true)
+
     try {
-      const res = await authService.login(form)
+      const res = await authAPI.login(form.email, form.password)
+
       const { user, access_token } = res.data
+
+      // SOLO guardar usuario y token
       login(user, access_token)
+
       toast.success(`¡Bienvenida, ${user.nombre}!`)
-      navigate(user.role === 'admin' ? '/admin' : '/profesional')
-    } catch (err) {
-      const msg = err.response?.data?.detail || 'Credenciales incorrectas'
-      toast.error(msg)
+    } catch (error) {
+        console.error(error);
+
+        let message = 'Error al iniciar sesión';
+
+        if (error.response?.data?.detail) {
+          if (typeof error.response.data.detail === 'string') {
+            message = error.response.data.detail;
+          } else if (Array.isArray(error.response.data.detail)) {
+            message = error.response.data.detail
+              .map((e) => e.msg)
+              .join(', ');
+          }
+        } toast.error(message);
+
     } finally {
       setLoading(false)
     }
@@ -51,29 +69,15 @@ export default function LoginPage() {
       {/* PANEL IZQUIERDO */}
       <div className={styles.leftPanel}>
         <div className={styles.leftContent}>
-
-          {/* Logo placeholder — reemplaza con tu imagen */}
-          <img src="/logo-entremanos.png" alt="Entre Manos" className={styles.logoImg} />
-          <div className={styles.logoWrapper}>
-            <div className={styles.logoCircle}>
-              <span className={styles.logoText}>EM</span>
-            </div>
-            <div className={styles.logoRing} />
-          </div>
-
-          <h1 className={styles.brandName}>Entre Manos</h1>
-          <p className={styles.brandSub}>Nails Spa · Estética</p>
-
+            <img
+              src="/logo/EntreM.jpg"
+              alt="Entre Manos"
+              className="login-logo"
+            />      
           <div className={styles.brandTagline}>
             Donde cada cita<br />
             es una obra de <em>arte</em>
-          </div>
-
-          <div className={styles.leftDots}>
-            <span className={`${styles.dot} ${styles.dotActive}`} />
-            <span className={styles.dot} />
-            <span className={styles.dot} />
-          </div>
+          </div>         
         </div>
       </div>
 

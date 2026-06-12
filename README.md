@@ -43,11 +43,11 @@ cd backend
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8001
 ```
 
-La API estará en: http://localhost:8000  
-Documentación automática: http://localhost:8000/api/docs
+La API estará en: http://localhost:8001
+Documentación automática: http://localhost:8001/api/docs
 
 ### 3. Frontend (React)
 

@@ -13,6 +13,7 @@ from app.services.auth_service import (
     get_user_by_email,
     get_user_by_id,
 )
+from app.core.security import hash_password
 
 # ── router se define PRIMERO ────────────────────────────
 router   = APIRouter(prefix="/auth", tags=["Autenticación"])
@@ -80,3 +81,29 @@ def seed_admin(data: UserCreate, db: Session = Depends(get_db)):
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+    
+# ── PUT /auth/users/{user_id}/reset-password ─────────────────────
+@router.put("/users/{user_id}/reset-password", response_model=UserResponse)
+def reset_user_password(
+    user_id: int,
+    body: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Solo el admin puede resetear contraseñas. No ve la contraseña actual."""
+    nueva = body.get("nueva_password", "").strip()
+    if len(nueva) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña debe tener al menos 6 caracteres",
+        )
+    user = get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado",
+        )
+    user.password = hash_password(nueva)
+    db.commit()
+    db.refresh(user)
+    return user

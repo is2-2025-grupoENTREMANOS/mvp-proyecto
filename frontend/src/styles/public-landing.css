@@ -6,6 +6,12 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  overflow-x: hidden;
+  overflow-y: auto;        /* ← esto lo desbloquea */
+  height: auto;
+}
 :root {
   --pri:    #4A7C59;
   --pri-dk: #3A6347;
@@ -23,7 +29,7 @@
   --shadow2: 0 16px 64px rgba(0,0,0,.12);
 }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: hidden; }
 
 body {
   font-family: 'Inter', sans-serif;
@@ -32,6 +38,7 @@ body {
   font-size: 15px;
   line-height: 1.6;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* ─── NAVBAR ─── */
