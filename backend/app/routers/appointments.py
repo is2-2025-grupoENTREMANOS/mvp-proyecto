@@ -1,13 +1,12 @@
-from typing import Optional
+from typing import List, Optional
+from datetime import datetime
+ 
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from datetime import datetime
-from fastapi import APIRouter
-from app.models.appointment import Appointment
-
+ 
 from app.core.database import get_db
+from app.models.appointment import Appointment
 from app.models.user import User
 from app.schemas.appointment import (
     AppointmentCreate,
@@ -26,47 +25,55 @@ from app.services.appointment_service import (
     cancel_appointment,
 )
 from app.routers.auth import get_current_user, require_admin
-
+ 
 router = APIRouter(prefix="/appointments", tags=["Citas"])
-
-
-# ── GET /appointments/ — todas las citas (admin) ────────────────
-# Dependencia opcional — no falla si no hay token:
-security_optional = HTTPBearer(auto_error=False)
-
+ 
+# Token opcional — no lanza error si no viene
+_optional_bearer = HTTPBearer(auto_error=False)
+ 
+ 
+# ── GET /appointments/ ──────────────────────────────────────────
+# Público cuando viene client_id (portal cliente).
+# Requiere token cuando NO viene client_id (admin/profesional).
 @router.get("/", response_model=List[AppointmentResponse])
 def list_appointments(
-    client_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    client_id:   Optional[int] = Query(None),
+    db:          Session = Depends(get_db),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
 ):
-
-    # IMPORTANTE: definir query primero
     query = db.query(Appointment)
-
-    # Si viene client_id, filtrar solo las citas de ese cliente
+ 
     if client_id is not None:
+        # Portal cliente — público, solo devuelve citas de ese cliente
         query = query.filter(Appointment.client_id == client_id)
-
-    # Ordenar por fecha
-    appointments = (
-        query
-        .order_by(Appointment.fecha_inicio.desc())
-        .all()
-    )
-
-    return appointments
-
-# ── GET /appointments/waitlist — lista de espera (admin) ────────
+        return query.order_by(Appointment.fecha_inicio.desc()).all()
+ 
+    # Sin client_id → requiere token válido
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Autenticación requerida",
+        )
+    from app.core.security import decode_token
+    payload = decode_token(credentials.credentials)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido",
+        )
+    return query.order_by(Appointment.fecha_inicio.desc()).all()
+ 
+ 
+# ── GET /appointments/waitlist ──────────────────────────────────
 @router.get("/waitlist", response_model=List[AppointmentResponse])
 def list_waitlist(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
     return get_waitlist(db)
-
-
-# ── GET /appointments/by-date — filtrar por rango de fechas ─────
+ 
+ 
+# ── GET /appointments/by-date ───────────────────────────────────
 @router.get("/by-date", response_model=List[AppointmentResponse])
 def list_by_date(
     fecha_inicio: datetime = Query(...),
@@ -75,24 +82,21 @@ def list_by_date(
     current_user: User = Depends(require_admin),
 ):
     return get_appointments_by_date_range(db, fecha_inicio, fecha_fin)
-
-
+ 
+ 
 # ── GET /appointments/professional/{id} ─────────────────────────
-@router.get(
-    "/professional/{professional_id}",
-    response_model=List[AppointmentResponse],
-)
+@router.get("/professional/{professional_id}", response_model=List[AppointmentResponse])
 def list_by_professional(
     professional_id: int,
     db: Session = Depends(get_db),
 ):
     return get_appointments_by_professional(db, professional_id)
-
-
+ 
+ 
 # ── GET /appointments/check-availability ────────────────────────
 @router.get("/check-availability")
 def check_availability(
-    professional_id: int   = Query(...),
+    professional_id: int      = Query(...),
     fecha_inicio:    datetime = Query(...),
     fecha_fin:       datetime = Query(...),
     db: Session = Depends(get_db),
@@ -101,8 +105,8 @@ def check_availability(
         db, professional_id, fecha_inicio, fecha_fin
     )
     return {"disponible": available}
-
-
+ 
+ 
 # ── GET /appointments/{id} ───────────────────────────────────────
 @router.get("/{appointment_id}", response_model=AppointmentResponse)
 def get_appointment(
@@ -117,20 +121,15 @@ def get_appointment(
             detail="Cita no encontrada",
         )
     return appt
-
-
-# ── POST /appointments/ — crear cita ────────────────────────────
-@router.post(
-    "/",
-    response_model=AppointmentResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+ 
+ 
+# ── POST /appointments/ ─────────────────────────────────────────
+# Público para BookingPage (clientes sin sesión crean citas)
+@router.post("/", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
 def create_new_appointment(
     data: AppointmentCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    db:   Session = Depends(get_db),
 ):
-    # Verificar disponibilidad si no es lista de espera
     if not data.en_lista_espera:
         disponible = check_professional_availability(
             db,
@@ -143,17 +142,16 @@ def create_new_appointment(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="El profesional no está disponible en ese horario",
             )
-
     return create_appointment(db, data)
-
-
-# ── PUT /appointments/{id} — actualizar cita ────────────────────
+ 
+ 
+# ── PUT /appointments/{id} ──────────────────────────────────────
 @router.put("/{appointment_id}", response_model=AppointmentResponse)
 def update_existing_appointment(
     appointment_id: int,
     data: AppointmentUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(get_current_user),
 ):
     appt = update_appointment(db, appointment_id, data)
     if not appt:
@@ -162,17 +160,14 @@ def update_existing_appointment(
             detail="Cita no encontrada",
         )
     return appt
-
-
-# ── PATCH /appointments/{id}/cancel — cancelar cita ─────────────
-@router.patch(
-    "/{appointment_id}/cancel",
-    response_model=AppointmentResponse,
-)
+ 
+ 
+# ── PATCH /appointments/{id}/cancel ────────────────────────────
+# Público: el portal cliente puede cancelar sus propias citas sin token
+@router.patch("/{appointment_id}/cancel", response_model=AppointmentResponse)
 def cancel_existing_appointment(
     appointment_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
 ):
     appt = cancel_appointment(db, appointment_id)
     if not appt:
@@ -181,3 +176,4 @@ def cancel_existing_appointment(
             detail="Cita no encontrada",
         )
     return appt
+ 

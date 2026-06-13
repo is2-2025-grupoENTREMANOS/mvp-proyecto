@@ -1,7 +1,6 @@
-import API from './authService';
+import API from './api';
 
 export const professionalService = {
-
   getAll: () =>
     API.get('/professionals/'),
 
@@ -13,5 +12,4 @@ export const professionalService = {
 
   cancelAppointment: (id) =>
     API.patch(`/appointments/${id}/cancel`),
-
 };

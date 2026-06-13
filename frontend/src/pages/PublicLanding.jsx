@@ -64,15 +64,27 @@ export default function PublicLanding() {
   useEffect(() => {
   // Cargar servicios
   serviceService.getAll()
-    .then(res => setServices(res.data))
-    .catch(() => setErrorSvc('No se pudieron cargar los servicios'))
-    .finally(() => setLoadingSvc(false));
+  .then(res => {
+    setServices(
+      Array.isArray(res.data)
+        ? res.data
+        : res.data.data || res.data.items || []
+    );
+  })
+  .catch(() => setErrorSvc('No se pudieron cargar los servicios'))
+  .finally(() => setLoadingSvc(false));
 
   // Cargar profesionales
   professionalService.getAll()
-    .then(res => setProfessionals(res.data))
-    .catch(() => setErrorPro('No se pudieron cargar los profesionales'))
-    .finally(() => setLoadingPro(false));
+  .then(res => {
+    setProfessionals(
+      Array.isArray(res.data)
+        ? res.data
+        : res.data.data || res.data.items || []
+    );
+  })
+  .catch(() => setErrorPro('No se pudieron cargar los profesionales'))
+  .finally(() => setLoadingPro(false));
 }, []);
 
   // ── Carrusel autoplay ──

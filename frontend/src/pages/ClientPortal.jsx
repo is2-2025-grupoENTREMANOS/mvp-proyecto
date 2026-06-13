@@ -85,28 +85,40 @@ export default function ClientPortal() {
     try {
       // 1. Buscar cliente por teléfono o email
       const res = await clientsAPI.search(searchValue.trim());
-      const clientes = res.data;
 
-      if (!clientes || clientes.length === 0) {
+      // El backend devuelve siempre un array — normalizamos por si acaso
+      const rawData = res.data;
+      const clientes = Array.isArray(rawData)
+        ? rawData
+        : Array.isArray(rawData?.items)
+        ? rawData.items
+        : rawData
+        ? [rawData]
+        : [];
+
+      if (clientes.length === 0) {
         setError('No encontramos ningún cliente con ese dato. Verifica e intenta de nuevo.');
         setSearched(true);
         return;
       }
 
+      // Buscar coincidencia exacta primero, luego el primero del array
+      const q = searchValue.trim().toLowerCase();
       const exactMatch = clientes.find(c =>
         c.telefono === searchValue.trim() ||
-        (c.email && c.email.toLowerCase() === searchValue.trim().toLowerCase())
+        (c.email && c.email.toLowerCase() === q)
       );
-      
       const foundClient = exactMatch || clientes[0];
 
       setClient(foundClient);
 
-      // Pedir SOLO las citas de ESE cliente pasando client_id como query param
+      // Pedir SOLO las citas de ese cliente
       const apptRes = await appointmentsAPI.getAll({ client_id: foundClient.id });
+      const rawAppts = apptRes.data;
+      const todasCitas = Array.isArray(rawAppts) ? rawAppts : [];
 
-      // Filtrar también en frontend como doble seguridad
-      const soloDelCliente = (apptRes.data || []).filter(
+      // Doble seguridad: filtrar por client_id en frontend
+      const soloDelCliente = todasCitas.filter(
         a => a.client_id === foundClient.id || a.client?.id === foundClient.id
       );
       setAppointments(soloDelCliente);

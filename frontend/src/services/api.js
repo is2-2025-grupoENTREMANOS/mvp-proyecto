@@ -1,136 +1,101 @@
 import axios from 'axios';
-
+ 
 const API = axios.create({
-  baseURL: 'http://localhost:8001',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8001',
+  withCredentials: true,
 });
-
+ 
+// ── TOKEN AUTOMÁTICO ─────────────────────────────
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
-
-// ── Interceptor de errores global ───────────────────────────────
+ 
+// ── INTERCEPTOR DE ERRORES ───────────────────────
 API.interceptors.response.use(
-  response => response,
-  error => {
+  (response) => response,
+  (error) => {
     const detail = error.response?.data?.detail;
-    if (Array.isArray(detail)) {
-      error.userMessage = detail.map(d => d.msg).join(', ');
-    } else if (typeof detail === 'string') {
-      error.userMessage = detail;
-    } else {
-      error.userMessage = 'Error de conexión con el servidor';
-    }
+    if (Array.isArray(detail))           error.userMessage = detail.map((d) => d.msg).join(', ');
+    else if (typeof detail === 'string') error.userMessage = detail;
+    else                                 error.userMessage = 'Error de conexión con el servidor';
     return Promise.reject(error);
   }
 );
-
-// ── AUTH ────────────────────────────────────────────────────────
-export const authAPI = {
-
-  login:  (email, password) => API.post('/auth/login', { email, password }),
-  getMe:  ()                => API.get('/auth/me'),
  
-  resetPassword: (userId, nuevaPassword) =>
-    API.put(`/auth/users/${userId}/reset-password`, { nueva_password: nuevaPassword }),
-
+// ── AUTH ─────────────────────────────────────────
+// Backend recibe JSON {email, password} — NO form-urlencoded
+export const authAPI = {
+  login:         (email, password) => API.post('/auth/login', { email, password }),
+  getMe:         ()                => API.get('/auth/me'),
+  resetPassword: (userId, password) =>
+    API.put(`/auth/users/${userId}/reset-password`, { password }),
 };
-
-// ── SERVICIOS ───────────────────────────────────────────────────
+ 
+// ── SERVICIOS ────────────────────────────────────
+// GET /services/    → activos (público)
+// GET /services/all → todos incluidos inactivos (admin)
 export const servicesAPI = {
-  getPublic:  ()           => API.get('/services/'),
-  getAdmin:   ()           => API.get('/services/all'),
-  getById:    (id)         => API.get(`/services/${id}`),
-  create:     (data)       => API.post('/services/', {
-    nombre:      data.nombre,
-    descripcion: data.descripcion || null,
-    duracion:    Number(data.duracion),
-    precio:      Number(data.precio),
-    imagen_url:  data.imagen_url || null,
-  }),
-  update:     (id, data)   => API.put(`/services/${id}`, {
-    nombre:      data.nombre      || undefined,
-    descripcion: data.descripcion || undefined,
-    duracion:    data.duracion    ? Number(data.duracion)  : undefined,
-    precio:      data.precio      ? Number(data.precio)    : undefined,
-    imagen_url:  data.imagen_url  || undefined,
-    activo:      data.activo      !== undefined ? data.activo : undefined,
-  }),
-  deactivate: (id)         => API.put(`/services/${id}`, { activo: false }),
+  getPublic:  ()         => API.get('/services/'),
+  getAll:     ()         => API.get('/services/'),
+  getAdmin:   ()         => API.get('/services/all'),
+  getById:    (id)       => API.get(`/services/${id}`),
+  create:     (data)     => API.post('/services/', data),
+  update:     (id, data) => API.put(`/services/${id}`, data),
+  deactivate: (id)       => API.put(`/services/${id}`, { activo: false }),
 };
-
-// ── PROFESIONALES ───────────────────────────────────────────────
+ 
+// ── PROFESIONALES ───────────────────────────────
+// GET /professionals/    → activos (público)
+// GET /professionals/all → todos incluidos inactivos (admin)
 export const professionalsAPI = {
-  getPublic:   ()           => API.get('/professionals/'),
-  getAdmin:    ()           => API.get('/professionals/all'),
-  getById:     (id)         => API.get(`/professionals/${id}`),
-  create:      (data)       => API.post('/professionals/', {
-    nombre:       data.nombre,
-    especialidad: data.especialidad || null,
-    telefono:     data.telefono     || null,
-    email:        data.email        || null,
-    descripcion:  data.descripcion  || null,
-    avatar_url:   null,
-    user_id:      null,
-    service_ids:  [],
-  }),
-  update:      (id, data)   => API.put(`/professionals/${id}`, {
-    nombre:       data.nombre       || undefined,
-    especialidad: data.especialidad || undefined,
-    telefono:     data.telefono     || undefined,
-    email:        data.email        || undefined,
-    descripcion:  data.descripcion  || undefined,
-    activo:       data.activo       !== undefined ? data.activo : undefined,
-    service_ids:  data.service_ids  || undefined,
-  }),
-  deactivate:  (id)         => API.put(`/professionals/${id}`, { activo: false }),
+  getPublic:  ()         => API.get('/professionals/'),
+  getAll:     ()         => API.get('/professionals/'),
+  getAdmin:   ()         => API.get('/professionals/all'),
+  getById:    (id)       => API.get(`/professionals/${id}`),
+  create:     (data)     => API.post('/professionals/', data),
+  update:     (id, data) => API.put(`/professionals/${id}`, data),
+  deactivate: (id)       => API.delete(`/professionals/${id}`),
 };
-
-// ── CLIENTES ────────────────────────────────────────────────────
+ 
+// ── CLIENTES ────────────────────────────────────
 export const clientsAPI = {
-  getAll:     ()           => API.get('/clients/'),
-  search:     (q)          => API.get(`/clients/search?q=${encodeURIComponent(q)}`),
-  getById:    (id)         => API.get(`/clients/${id}`),
-  create:     (data)       => API.post('/clients/', {
+  getAll:     ()         => API.get('/clients/'),
+  search:     (q)        => API.get('/clients/search', { params: { q } }),
+  getById:    (id)       => API.get(`/clients/${id}`),
+  create:     (data)     => API.post('/clients/', {
     nombre:   data.nombre,
     telefono: data.telefono || null,
     email:    data.email    || null,
     notas:    data.notas    || null,
   }),
-  update:     (id, data)   => API.put(`/clients/${id}`, data),
-  deactivate: (id)         => API.delete(`/clients/${id}`),
-  block:      (id)         => API.patch(`/clients/${id}/block`),
+  update:     (id, data) => API.put(`/clients/${id}`, data),
+  deactivate: (id)       => API.delete(`/clients/${id}`),
+  block:      (id)       => API.patch(`/clients/${id}/block`),
 };
-
-// ── CITAS ───────────────────────────────────────────────────────
+ 
+// ── CITAS ───────────────────────────────────────
 export const appointmentsAPI = {
-  getAll: (params = {}) =>
-  api.get('/appointments/', { params }),
-  byProfessional: (id) =>
-  API.get(`/appointments/professional/${id}`),
-  getAll:            ()                    => API.get('/appointments/'),
-  getByProfessional: (id)                  => API.get(`/appointments/professional/${id}`),
-  getByDate:         (start, end)          => API.get('/appointments/by-date', {
-    params: { fecha_inicio: start, fecha_fin: end }
-  }),
-  checkAvailability: (profId, start, end)  => API.get('/appointments/check-availability', {
-    params: { professional_id: profId, fecha_inicio: start, fecha_fin: end }
-  }),
-  getById:           (id)                  => API.get(`/appointments/${id}`),
-  create:            (data)                => API.post('/appointments/', data),
-  update:            (id, data)            => API.put(`/appointments/${id}`, data),
-  cancel:            (id)                  => API.patch(`/appointments/${id}/cancel`),
-  complete:          (id)                  => API.put(`/appointments/${id}`, {
-    estado: 'completada'
-  }),
-  getWaitlist:       ()                    => API.get('/appointments/waitlist'),
+  // Lista con filtro opcional por client_id (público cuando viene client_id)
+  getAll:            (params = {})                       => API.get('/appointments/', { params }),
+  getById:           (id)                                => API.get(`/appointments/${id}`),
+  getByProfessional: (professionalId)                    => API.get(`/appointments/professional/${professionalId}`),
+  getByDate:         (fechaInicio, fechaFin)             => API.get('/appointments/by-date', { params: { fecha_inicio: fechaInicio, fecha_fin: fechaFin } }),
+  getWaitlist:       ()                                  => API.get('/appointments/waitlist'),
+  checkAvailability: (professionalId, fechaInicio, fechaFin) =>
+    API.get('/appointments/check-availability', {
+      params: { professional_id: professionalId, fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+    }),
+  create:  (data)     => API.post('/appointments/', data),
+  update:  (id, data) => API.put(`/appointments/${id}`, data),
+  cancel:  (id)       => API.patch(`/appointments/${id}/cancel`),
 };
-
-// ── CONFIGURACIÓN DEL NEGOCIO ───────────────────────────────────
+ 
+// ── SETTINGS ────────────────────────────────────
 export const settingsAPI = {
   getBusiness:    ()     => API.get('/settings/business'),
   updateBusiness: (data) => API.put('/settings/business', data),
 };
-
+ 
 export default API;
